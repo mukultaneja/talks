@@ -1,0 +1,185 @@
+
+{%code%}
+
+import pandas as pd
+
+page = args.get('page', [None])[0]
+year = args.get('year', [None])[0]
+state_name = args.get('statename', [None])[0]
+gender = args.get('gender', [None])[0]
+
+if page == 'state':
+	data = pd.read_csv('state-literacy.csv')
+elif page == 'gender':
+	data = pd.read_csv('gender-literacy.csv')
+else:
+	data = None
+
+if data is not None:
+	df = pd.DataFrame(columns=('x', 'y'))
+	if year is not None:
+		if page == 'state':
+			df[['x', 'y']] = data[['State/ UTs', year]]
+			df = df.sort_values(by=['y'], ascending=False)
+			df = df.fillna(0)
+			df.to_csv('bar_data.csv')
+		elif page == 'gender':
+			df[['x', 'y']] = data[['Particulars', year]]
+			df = df.fillna(0)
+			df.to_csv('bar_data.csv')
+		else:
+			df.to_csv('bar_data.csv')
+	if state_name is not None:
+		df[['x', 'y']] = data[data['State/ UTs'] == state_name].transpose().reset_index().iloc[1:, :]
+		df = df.fillna(0)
+		df.to_csv('bar_data.csv')
+	if gender is not None:
+		df[['x', 'y']] = data[data['Particulars'] == gender].transpose().reset_index().iloc[1:, :]
+		df = df.fillna(0)
+		df.to_csv('bar_data.csv')
+	else:
+		df.to_csv('bar_data.csv')
+{%end%}
+
+<html>
+	<head>
+		<title>Live Analysis Example</title>
+		<link rel="stylesheet" href="{{ static_url('bower_components/bootstrap/dist/css/bootstrap.css') }}" />
+		<style type="text/css">
+			.barchart {
+			    margin-top: 50px;
+			}
+			.bar {
+			  fill: steelblue;
+			}
+
+			.bar:hover {
+			  fill: brown;
+			}
+
+			.axis {
+			  font: 10px sans-serif;
+			}
+
+			.axis path,
+			.axis line {
+			  fill: none;
+			  stroke: #000;
+			  shape-rendering: crispEdges;
+			}
+
+			.x.axis path {
+			  display: none;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div class="container-fluid">
+			<div class="container">
+				<div class="row">
+					<h2>Live Analysis Example</h2>
+				</div>
+			</div>
+			<div class="container">
+				<div class="row">
+					<ul class="nav nav-tabs">
+					  <li role="presentation">
+					  	<a href="?page=state">State Literacy</a>
+					  </li>
+					  <li role="presentation">
+					  	<a href="?page=gender">Gender Literacy</a>
+					  </li>
+					</ul>
+				</div>
+			</div>
+			&nbsp;&nbsp;
+			<div class="container">
+				{% if page == 'state' %}
+					{% if data is not None %}
+						<ul class="nav nav-tabs">
+						{% for col in data.columns.tolist()[1:] %}
+								<li role="presentation">
+									<a href="?page={{page}}&year={{col}}">{{col}}</a>
+								</li>
+							{%end%}
+						</ul>
+						<br />
+						<ul class="nav nav-tabs">
+						{% for col in data.iloc[:, 0].tolist() %}
+								<li role="presentation">
+									<a href="?page={{page}}&statename={{col}}">{{col}}</a>
+								</li>
+							{%end%}
+						</ul>
+					{%end%}
+				{%else%}
+					{% if data is not None %}
+						<ul class="nav nav-tabs">
+						{% for col in data.columns.tolist()[1:] %}
+								<li role="presentation">
+									<a href="?page={{page}}&year={{col}}">{{col}}</a>
+								</li>
+							{%end%}
+						</ul>
+						<br />
+						<ul class="nav nav-tabs">
+						{% for col in data.iloc[:, 0].tolist() %}
+								<li role="presentation">
+									<a href="?page={{page}}&gender={{col}}">{{col}}</a>
+								</li>
+							{%end%}
+						</ul>
+					{%end%}
+				{%end%}
+
+			</div>
+			<div class="container barchart"></div>
+		</div>
+		<script type="text/javascript" src="{{ static_url('bower_components/d3/d3.min.js') }}"></script>
+		<script type="text/javascript">
+			var w = 420;
+			var h = 20;
+			var margin = {top: 300, right: 20, bottom: 30, left: 40};
+
+			var x = d3.scale.ordinal().rangeRoundBands([0, w], .3);
+    		var y = d3.scale.linear().range([100, 0]);
+    		var xAxis = d3.svg.axis().scale(x).orient("bottom");
+
+    		var yAxis = d3.svg.axis().scale(y).orient("left").ticks(10, "%");
+
+			d3.csv("bar_data.csv",function(error, data) {
+				x.domain(data.map(function(d) { return d.x; }));
+
+  				y.domain([0, d3.max(data, function(d) { return d.y; })]);
+				var svg = d3.select('div.barchart')
+						.append('svg')
+						.attr('width', w)
+						.attr('height', h * data.length);
+
+				var bar = svg.selectAll("g")
+							 .data(data)
+  							 .enter().append("g")
+    						 .attr("transform", function(d, i) { return "translate(0," + i * h + ")"; });
+
+    			bar.append("text")
+				    .attr("x", function(d) { return 0; })
+				    .attr("y", h / 2)
+				    .attr("dy", ".35em")
+				    .text(function(d) { return d.x; });
+
+    			bar.append("rect")
+    				.attr("width", function(d){ return d.y  })
+    				.attr("height", h - 1)
+    				.attr('class', 'bar')
+    				.attr('transform', 'translate(200, 0)')
+
+    			bar.append("text")
+    				.attr("x", function(d){ return d.y })
+    				.attr("y", h - 1)
+    				.attr('transform', 'translate(210, -7)')
+    				.text(function(d){ return d.y; });
+			});
+		</script>
+	</body>
+</html>
